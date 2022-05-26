@@ -1,7 +1,7 @@
 # ZLY_GWASonHumanEyeColor
 
 This is the project of GWAS on eye color.  
-See raw code in the .rmd and see results in the pdf file.
+See raw code in the .rmd and see results in the pdf file.   
 While raw files are too large to upload.
 
 ## References:
