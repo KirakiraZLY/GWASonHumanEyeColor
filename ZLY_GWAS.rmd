@@ -1,0 +1,213 @@
+### GWAS on Eye Color
+Author: 张乐艺Zhang Leyi
+Date: 2022-05-26
+
+```{r}
+library(rehh)
+library(SNPRelate)
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+
+```
+## Missing Data
+plink --allow-no-sex --bfile eye_color --missing --out eye_color
+This creates the files eye_color.imiss and eye_color.lmiss
+To analyse the heterozygosity of the sample --het is used
+plink --allow-no-sex --bfile eye_color --het --out eye_color
+```{r}
+
+imiss = read.table('eye_color.imiss', header = T, sep="")
+het = read.table('eye_color.het', header = T, sep="")
+
+het$obs_het = (het$N.NM. - het$O.HOM.)/het$N.NM.
+mean_het = mean(het$obs_het)
+sd_het = sd(het$obs_het)
+
+ggplot(data = het, aes(x = obs_het, y = imiss$F_MISS)) +
+ geom_point( size=2, alpha=0.5) +
+ labs(y = "missing SNPs per individual", x = "hetero rate per individual") +
+ geom_vline(xintercept = mean_het + 3*sd_het, color = "red") +
+ geom_vline(xintercept = mean_het - 3*sd_het, color = "red") +
+ theme_bw() +
+ labs(title = "Hetero rate : missing SNPs") +
+ theme(plot.title = element_text(hjust = 0.5))
+
+
+right = mean_het + 3*sd(het$obs_het)
+left = mean_het - 3*sd(het$obs_het)
+filtering = cbind(imiss, het)
+outlier_ind = subset(filtering, filtering$obs_het > right | filtering$obs_het < left)
+write.table(outlier_ind[,c(1,2)], 'missing_values.txt', col.names = FALSE, row.names = FALSE)
+
+```
+
+
+## Relatedness
+```{r}
+ibd <- read.table('GWA-QC.genome', header = TRUE)
+members <- ibd$FID1
+members <- unique(members)
+write.table(cbind(members,members), file = 'wrong_ibd.txt', col.names = F, row.names = F)
+```
+
+## PCA
+Change column numbers into 3
+```{r}
+pheno <- read.table('./eye_color.txt',
+    sep=' ', header = T)
+
+id <- pheno[1]
+IID <- pheno[1]
+eye_color <- pheno[2]
+pheno <- cbind(id,IID,eye_color)
+colnames(pheno) <- c("id","IID","eye_color")
+
+pheno$eye_color[pheno$eye_color == 'hazel/brown-green'] <- as.numeric(1)
+pheno$eye_color[pheno$eye_color == 'blue-green'] <- as.numeric(2)
+pheno$eye_color[pheno$eye_color == 'blue-grey'] <- as.numeric(2)
+pheno$eye_color[pheno$eye_color == 'dark_brown'] <- as.numeric(1)
+pheno$eye_color[pheno$eye_color == 'dark_blue'] <- as.numeric(2)
+pheno$eye_color[pheno$eye_color == 'amber-brown'] <- as.numeric(1)
+pheno$eye_color[pheno$eye_color == 'green-gray'] <- as.numeric(2)
+pheno$eye_color[pheno$eye_color == 'blue-green-gold'] <- as.numeric(2)
+pheno$eye_color[pheno$eye_color == 'blue-green-grey'] <- as.numeric(2)
+pheno$eye_color[pheno$eye_color == 'brown'] <- as.numeric(1)
+pheno$eye_color[pheno$eye_color == 'blue'] <- as.numeric(2)
+pheno$eye_color[pheno$eye_color == 'green'] <- as.numeric(2)
+
+pheno <- as.data.frame(lapply(pheno, as.numeric))
+
+# write.table(pheno, file = 'eye_color.txt', col.names = T, row.names = F)
+```
+
+With the phenotype file, the Fisher’s exact test is performed.
+```{r}
+test_missing = read.table('eye_color.missing', header = TRUE)
+fail_diffmiss_qc = test_missing[test_missing$P < 10e-5, 2]
+write.table(fail_diffmiss_qc, file = 'fail-diffmiss-qc.txt', row.names = F, col.names = F)
+```
+These variants are then filtered out. Furthermore, any variant with a missing genotype rate larger than 0.5, a too large deviation from Hardy-Weinberg equilibrium or has a MAF (minor allele frequency) of less than 0.01.
+
+```{r}
+Sys.setenv(https_proxy = "http://proxyserv:3128", http_proxy = "http://proxyserv:3128")
+# BiocManager::install(c("SNPRelate"))
+
+library(SNPRelate)
+library(ggplot2)
+
+pca<- read.table("eye_color.eigenvec", header=F ,sep=" ")
+pch=c(rep(1,5),rep(2,3))
+col = pch
+plot(pca$V3,pca$V4,pch=c(rep(1,5),rep(2,3)),col=col,main="pca",xlab="pc1",ylab="pc2")
+plot(pca$V4,pca$V5,pch=c(rep(1,5),rep(2,3)),col=col,main="pca",xlab="pc2",ylab="pc3")
+```
+
+
+Manhattan
+```{r}
+d <- read.table('eye_color.assoc.fisher', head=T)
+# library(CRAN)
+library(qqman)
+# manhattan(d,highlight = d$P,p="P",chr = "CHR",ps = "BP",col = c("blue","orange"),ylim = c(0, 30))
+qq(d$P)
+
+```
+
+```{r}
+
+# association_test = read.table("eye_color.significant.txt.assoc", header = T)
+association_test <- d
+corrected_level <- 0.05/length(association_test$SNP)
+manhattan(association_test, suggestiveline = FALSE, main = "Manhattan Plot", genomewideline = -log10(corrected_level), annotatePval = corrected_level, col = c("blue","orange"))
+# write.table(association_test, file = 'eye_color.loci.txt',quote = FALSE, col.names = T, row.names = F)
+
+# sl <- read.table('eye_color.significant.txt.assoc', head=T)
+# sig_loci <- sl[(-log10(sl$P)>7.31),]
+# sig_loci <- na.omit(sig_loci)
+# manhattan(sig_loci,highlight = d$P,p="P",chr = "CHR",ps = "BP",col = c("blue","orange"),ylim = c(0, 50))
+# write.table(sig_loci, file = 'eye_color.loci.txt',quote = FALSE, col.names = T, row.names = F)
+```
+
+```{r}
+
+sl2 <- as.data.frame(read.table("eye_color.bed",header = FALSE, sep="\t",stringsAsFactors=FALSE, quote=""))
+
+```
+
+### Question 4
+Part 1: change phenotypes from -9 to 0/1
+```{r}
+
+df1 <- read.table('./eye_color.txt',
+    sep=' ', header = T)
+df2 <- read.table('./eye_color1.fam',
+    sep='\t', header = T)
+
+df2[df2$A == df1$id,]$F = df1$eye_color
+write.table(df2, file = 'eye_color.fam',quote = FALSE, col.names = F, row.names = F)
+
+```
+
+Part 2:
+distribution of genotypes:
+```{r}
+
+df3 <- read.table('./eye_color_rs16891982.snp.txt.raw',
+    sep=' ', header = T)
+df3[is.na(df3)] = 0
+# write.table(df3, file = 'eye_color.snp.txt.raw.x',quote = FALSE, col.names = F, row.names = F)
+
+library(plyr)
+# df3_1 <- df3[6:35]
+t1 <- table(df3$PHENOTYPE,df3[,7])
+tb1 <- as.data.frame(t1)
+cname <- c("Phenotype","Genotype","Count")
+colnames(tb1) <- cname
+# tb1$Phenotype[tb1$Phenotype == 1] <- as.character('Brown')
+# tb1$Phenotype[tb1$Phenotype == 2] <- as.character('Green')
+tb1
+# plot(tb1)
+
+# agg <- aggregate(cbind(count = PHENOTYPE) ~ .,
+#           data = df3_1,
+#           FUN = function(x){NROW(x)})
+ggplot(tb1, aes(x = Genotype, y = Count, fill = Phenotype, colour = Phenotype)) +
+  geom_bar(stat = 'identity',
+           position = 'fill') +
+  ggtitle("rs16891982") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_fill_discrete(labels = c("brown","blue")) +
+  scale_color_discrete(labels = c("brown","blue")) +
+  scale_x_discrete(labels=c("Reference", "Heterozygotes", "Homozygotes"))
+
+
+# summary(df3)
+
+```
+
+
+
+## Assosciation tests
+```{r}
+results1<-read.table("plink.assoc.linear",header=T)
+color_set <- rainbow(9)
+# jpeg("Linear_manhattan.jpeg")/
+# manhattan(results1,chr="CHR",bp="BP",p="P",snp="SNP",col=color_set, main = "Manhattan plot: linear",ylim = c(0, 50))
+
+manhattan(results1, suggestiveline = FALSE, main = "Manhattan Plot",chr="CHR",bp="BP",p="P",snp="SNP", col = color_set,ylim = c(0, 500))
+# dev.off()
+```
+
+```{r}
+
+# qq(results1$P, main = "Q-Q plot of GWAS p-values : log")
+p_value=results1$P
+z = qnorm(p_value/ 2)
+lambda = round(median(z^2, na.rm = TRUE) / 0.454, 3)
+qq(results1$P, main = "Q-Q plot of GWAS p-values : log",sub=paste("lamda=",lambda))
+# dev.off()
+
+
+```
+
