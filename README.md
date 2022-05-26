@@ -2,6 +2,7 @@
 
 This is the project of GWAS on eye color.  
 See raw code in the .rmd and see results in the pdf file.
+While raw files are too large to upload.
 
 ## References:
    1.	 Simcoe M, Valdes A, Liu F, Furlotte NA, Evans DM, Hemani G, Ring SM, Smith GD, Duffy DL, Zhu G, Gordon SD, Medland SE, Vuckovic D, Girotto G, Sala C, Catamo E, Concas MP, Brumat M, Gasparini P, Toniolo D, Cocca M, Robino A, Yazar S, Hewitt A, Wu W, Kraft P, Hammond CJ, Shi Y, Chen Y, Zeng C, Klaver CCW, Uitterlinden AG, Ikram MA, Hamer MA, van Duijn CM, Nijsten T, Han J, Mackey DA, Martin NG, Cheng CY; 23andMe Research Team; International Visible Trait Genetics Consortium, Hinds DA, Spector TD, Kayser M, Hysi PG. Genome-wide association study in almost 195,000 individuals identifies 50 previously unidentified genetic loci for eye color. Sci Adv. 2021 Mar 10;7(11):eabd1239. doi: 10.1126/sciadv.abd1239. PMID: 33692100; PMCID: PMC7946369.
